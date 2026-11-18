@@ -1,0 +1,44 @@
+services:
+  oracle:
+    image: gvenzl/oracle-free:23.26.3-slim
+    environment:
+      ORACLE_PASSWORD: ${ORACLE_PASSWORD:?Defina ORACLE_PASSWORD no arquivo .env}
+      APP_USER: ${APP_DB_USER:?Defina APP_DB_USER no arquivo .env}
+      APP_USER_PASSWORD: ${APP_DB_PASSWORD:?Defina APP_DB_PASSWORD no arquivo .env}
+    volumes:
+      - oracle-data:/opt/oracle/oradata
+    networks:
+      - cidade-tech
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 120s
+
+  api:
+    profiles:
+      - application
+    build:
+      context: ./api
+    image: cidade-tech-api:local
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:oracle:thin:@oracle:1521/FREEPDB1
+      SPRING_DATASOURCE_USERNAME: ${APP_DB_USER:?Defina APP_DB_USER no arquivo .env}
+      SPRING_DATASOURCE_PASSWORD: ${APP_DB_PASSWORD:?Defina APP_DB_PASSWORD no arquivo .env}
+    ports:
+      - "8080:8080"
+    networks:
+      - cidade-tech
+    depends_on:
+      oracle:
+        condition: service_healthy
+    restart: unless-stopped
+
+networks:
+  cidade-tech:
+    driver: bridge
+
+volumes:
+  oracle-data:
