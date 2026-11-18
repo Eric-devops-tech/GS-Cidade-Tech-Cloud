@@ -181,7 +181,9 @@ A porta 1521 não é publicada na VM; o banco só é acessível pela rede do Com
 7. INTEGRAR E SUBIR A API JAVA (PENDENTE DA ENTREGA DA API)
 -----------------------------------------------------------
 Executar somente depois que a API e o Dockerfile estiverem em api/, configurados
-para JDBC oracle:1521/FREEPDB1 e integrados ao repositorio.
+para JDBC oracle:1521/FREEPDB1 e integrados ao repositório. O esquema simples do
+Cloud deve ser o combinado com a equipe Java; não use automaticamente os scripts
+e as rotinas PL/SQL da entrega separada da disciplina Database.
 
 $deployApplicationScript = @'
 set -eu
@@ -248,18 +250,22 @@ az vm run-command invoke `
 Quando a API estiver integrada, acrescente a evidência dos logs da aplicação:
 docker compose logs --tail=100 api
 
-10. CONSULTA DIRETA AO ORACLE (APÓS CRIAR E CARREGAR AS TABELAS)
----------------------------------------------------------------
+10. CONSULTA DIRETA AO ORACLE (APÓS A API CRIAR AS TABELAS)
+-----------------------------------------------------------
 O comando executa SQL*Plus dentro do container Oracle, sem publicar a porta
-1521. Execute somente depois que as tabelas do projeto tiverem sido criadas.
+1521. Esta consulta genérica lista as tabelas do usuário da aplicação; depois
+que seu amigo confirmar os nomes e as colunas, acrescente um SELECT que mostre
+registros da tabela relacionada usada pela API.
 
 $selectDatabaseScript = @'
 set -eu
 cd /opt/cidade-tech
 docker compose exec -T oracle bash -lc "sqlplus -s / as sysdba <<'SQL'
 SET PAGESIZE 50
-SELECT COUNT(*) AS TOTAL_CONSULTAS FROM CIDADETECH_APP.TB_CT_CONSULTA;
-SELECT COUNT(*) AS TOTAL_VOTOS FROM CIDADETECH_APP.TB_CT_VOTO;
+SELECT table_name
+FROM dba_tables
+WHERE owner = 'CIDADETECH_APP'
+ORDER BY table_name;
 EXIT
 SQL"
 '@

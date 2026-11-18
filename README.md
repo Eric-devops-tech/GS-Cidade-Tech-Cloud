@@ -20,9 +20,10 @@ copiável em texto simples está em [azure-cli-comandos.txt](azure-cli-comandos.
 
 ## Estado do trabalho
 
-- [x] Proposta e modelo Oracle/PLSQL da disciplina Database.
+- [x] Proposta Cidade Tech alinhada ao tema CitizenTech.
 - [x] Desenho da arquitetura de infraestrutura Azure.
 - [x] Compose com Oracle e perfil para a futura API Java.
+- [ ] Confirmar com a equipe Java o esquema Oracle simples usado pela API.
 - [ ] Receber a API Java/Spring Boot e confirmar seu contrato de integração.
 - [ ] Executar e validar a integração API–Oracle.
 - [ ] Provisionar a VM Azure, implantar containers e coletar evidências.
@@ -50,8 +51,9 @@ estejam disponíveis em `api/`. A API ainda não foi entregue pela equipe Java.
 
 3. Aguarde o health check ficar `healthy`. O serviço Oracle fica disponível na
    rede Docker como `oracle:1521/FREEPDB1`. A porta 1521 não é publicada no host.
-4. Execute os scripts SQL/PLSQL do projeto Database conectando-se ao usuário
-   definido em `APP_DB_USER`.
+4. O esquema usado no Cloud será o modelo Oracle simples combinado com a equipe
+   Java para a API. Os scripts e as regras PL/SQL da disciplina Database são uma
+   entrega separada e não são pré-requisito para subir este container.
 
 ## Executar com a API
 
@@ -70,7 +72,11 @@ Contrato inicial esperado pela API:
 - Usuário e senha: `APP_DB_USER` e `APP_DB_PASSWORD` do `.env`
 - Porta HTTP da aplicação: `8080`
 
-O contrato deverá ser conferido com o responsável pela API antes da integração.
+O contrato, o esquema simples e a forma como as tabelas serão criadas (pela API
+ou por script de inicialização) devem ser confirmados com o responsável pela API
+antes da integração. O modelo Cloud deve continuar coerente com as consultas
+comunitárias do Cidade Tech e atender ao requisito de pelo menos duas tabelas
+relacionadas.
 
 ## Segurança e limites da demonstração
 
