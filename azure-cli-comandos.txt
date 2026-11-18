@@ -1,0 +1,295 @@
+CIDADE TECH - COMANDOS AZURE CLI
+Global Solution 2026/2 - DevOps Tools & Cloud Computing
+
+COMO USAR
+----------
+Os comandos Azure CLI abaixo foram escritos para PowerShell no Windows.
+Execute uma secao de cada vez e confira a saida antes de continuar.
+As linhas iniciadas por # sao comentarios, nao comandos.
+
+ATENCAO
+-------
+- Este roteiro provisiona recursos Azure que podem gerar custos.
+- Os comandos ainda nao foram executados nesta assinatura.
+- Confirme a assinatura e a disponibilidade do tamanho da VM na regiao.
+- Substitua 203.0.113.10/32 pelo IP publico real autorizado antes de criar a NSG.
+  Esse IP e apenas um exemplo reservado e nao permite acesso a aplicacao.
+- Nao abra a porta 1521 do Oracle nem a porta 22 do SSH para a Internet.
+- A VM usa Azure Run Command para administracao, sem SSH publico.
+- A API Java ainda esta pendente. Os comandos da API nesta lista so devem ser
+  executados depois que o codigo e o Dockerfile forem integrados neste repositorio.
+- Nunca coloque senhas reais em comandos, no Git, em capturas de tela ou no video.
+- A remocao do Resource Group no final e opcional e destrutiva. Confira o nome
+  e faca backup antes de executa-la.
+
+1. LOGIN, ASSINATURA E VARIAVEIS
+--------------------------------
+
+az login
+az account show --output table
+
+$resourceGroup = "rg-cidade-tech"
+$location = "chilecentral"
+$vnetName = "vnet-cidade-tech"
+$subnetName = "snet-app"
+$nsgName = "nsg-cidade-tech"
+$publicIpName = "pip-cidade-tech"
+$nicName = "nic-cidade-tech"
+$vmName = "vm-cidade-tech"
+$allowedIp = "203.0.113.10/32" # Troque pelo IP real autorizado
+
+2. RESOURCE GROUP, VNET E SUBNET
+--------------------------------
+
+az group create `
+  --name $resourceGroup `
+  --location $location `
+  --tags project=CidadeTech purpose=academic-demo
+
+az network vnet create `
+  --resource-group $resourceGroup `
+  --name $vnetName `
+  --location $location `
+  --address-prefixes 10.20.0.0/16 `
+  --subnet-name $subnetName `
+  --subnet-prefixes 10.20.1.0/24
+
+3. NSG E REGRA DE ENTRADA DA API
+--------------------------------
+
+az network nsg create `
+  --resource-group $resourceGroup `
+  --name $nsgName `
+  --location $location
+
+az network nsg rule create `
+  --resource-group $resourceGroup `
+  --nsg-name $nsgName `
+  --name AllowApi8080FromEvaluator `
+  --priority 1100 `
+  --direction Inbound `
+  --access Allow `
+  --protocol Tcp `
+  --source-address-prefixes $allowedIp `
+  --source-port-ranges "*" `
+  --destination-address-prefixes "*" `
+  --destination-port-ranges 8080
+
+az network vnet subnet update `
+  --resource-group $resourceGroup `
+  --vnet-name $vnetName `
+  --name $subnetName `
+  --network-security-group $nsgName
+
+A NSG e aplicada a subnet. A regra de negacao padrao bloqueia outras conexoes
+de entrada. Nao crie regras para Oracle 1521 ou SSH 22.
+
+4. PUBLIC IP, NIC E MAQUINA VIRTUAL
+-----------------------------------
+
+az network public-ip create `
+  --resource-group $resourceGroup `
+  --name $publicIpName `
+  --location $location `
+  --sku Standard `
+  --allocation-method Static
+
+az network nic create `
+  --resource-group $resourceGroup `
+  --name $nicName `
+  --location $location `
+  --vnet-name $vnetName `
+  --subnet $subnetName `
+  --public-ip-address $publicIpName
+
+az vm create `
+  --resource-group $resourceGroup `
+  --name $vmName `
+  --location $location `
+  --size Standard_B2s_v2 `
+  --image Ubuntu2204 `
+  --admin-username azureuser `
+  --generate-ssh-keys `
+  --nics $nicName `
+  --nsg-rule NONE `
+  --tags project=CidadeTech purpose=academic-demo
+
+Confirme preco e disponibilidade de Standard_B2s_v2 em chilecentral antes de
+executar. A Oracle Free e a API compartilham a memoria da VM.
+
+5. INSTALAR DOCKER ENGINE E COMPOSE NA VM
+-----------------------------------------
+Azure Run Command executa o script Linux abaixo dentro da VM como administrador.
+Ele instala o Docker Engine e o plugin oficial Docker Compose.
+
+$bootstrapScript = @'
+set -eu
+apt-get update
+apt-get install -y ca-certificates curl git openssl
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+. /etc/os-release
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $VERSION_CODENAME stable" > /etc/apt/sources.list.d/docker.list
+apt-get update
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+systemctl enable --now docker
+docker --version
+docker compose version
+'@
+
+az vm run-command invoke `
+  --resource-group $resourceGroup `
+  --name $vmName `
+  --command-id RunShellScript `
+  --scripts $bootstrapScript `
+  --output table
+
+6. BAIXAR O PROJETO E INICIAR O ORACLE
+--------------------------------------
+O script cria credenciais aleatorias diretamente na VM e grava o arquivo .env
+com permissao restrita. As senhas nao sao exibidas na saida do Azure CLI.
+
+$deployOracleScript = @'
+set -eu
+if [ ! -d /opt/cidade-tech/.git ]; then
+  git clone https://github.com/Eric-devops-tech/GS-Cidade-Tech-Cloud.git /opt/cidade-tech
+else
+  git -C /opt/cidade-tech pull --ff-only
+fi
+cd /opt/cidade-tech
+if [ ! -f .env ]; then
+  umask 077
+  ORACLE_PASSWORD=$(openssl rand -hex 24)
+  APP_DB_PASSWORD=$(openssl rand -hex 24)
+  printf 'ORACLE_PASSWORD=%s\nAPP_DB_USER=CIDADETECH_APP\nAPP_DB_PASSWORD=%s\n' "$ORACLE_PASSWORD" "$APP_DB_PASSWORD" > .env
+fi
+docker compose up -d --wait --wait-timeout 600 oracle
+docker compose ps
+'@
+
+az vm run-command invoke `
+  --resource-group $resourceGroup `
+  --name $vmName `
+  --command-id RunShellScript `
+  --scripts $deployOracleScript `
+  --output table
+
+O volume oracle-data mantem os arquivos do Oracle entre reinicios do container.
+A porta 1521 nao e publicada na VM; o banco so e acessivel pela rede do Compose.
+
+7. INTEGRAR E SUBIR A API JAVA (PENDENTE DA ENTREGA DA API)
+-----------------------------------------------------------
+Executar somente depois que a API e o Dockerfile estiverem em api/, configurados
+para JDBC oracle:1521/FREEPDB1 e integrados ao repositorio.
+
+$deployApplicationScript = @'
+set -eu
+git -C /opt/cidade-tech pull --ff-only
+cd /opt/cidade-tech
+test -f api/Dockerfile
+docker compose --profile application up -d --build --wait --wait-timeout 600
+docker compose ps
+'@
+
+az vm run-command invoke `
+  --resource-group $resourceGroup `
+  --name $vmName `
+  --command-id RunShellScript `
+  --scripts $deployApplicationScript `
+  --output table
+
+O endpoint do CRUD depende das rotas que forem implementadas na API. Atualize
+este arquivo e o README com os endpoints reais antes de gravar o video.
+
+8. VERIFICAR RECURSOS AZURE
+---------------------------
+
+az vm list `
+  --resource-group $resourceGroup `
+  --show-details `
+  --output table
+
+az network vnet show `
+  --resource-group $resourceGroup `
+  --name $vnetName `
+  --output table
+
+az network nsg rule list `
+  --resource-group $resourceGroup `
+  --nsg-name $nsgName `
+  --output table
+
+az network public-ip show `
+  --resource-group $resourceGroup `
+  --name $publicIpName `
+  --query ipAddress `
+  --output tsv
+
+9. VERIFICAR DOCKER, CONTAINERS E LOGS NA VM
+--------------------------------------------
+
+$inspectContainersScript = @'
+set -eu
+cd /opt/cidade-tech
+docker --version
+docker compose version
+docker compose ps
+docker compose logs --tail=100 oracle
+'@
+
+az vm run-command invoke `
+  --resource-group $resourceGroup `
+  --name $vmName `
+  --command-id RunShellScript `
+  --scripts $inspectContainersScript `
+  --output table
+
+Quando a API estiver integrada, acrescente a evidencia dos logs da aplicacao:
+docker compose logs --tail=100 api
+
+10. CONSULTA DIRETA AO ORACLE (APOS CRIAR E CARREGAR AS TABELAS)
+---------------------------------------------------------------
+O comando executa SQL*Plus dentro do container Oracle, sem publicar a porta
+1521. Execute somente depois que as tabelas do projeto tiverem sido criadas.
+
+$selectDatabaseScript = @'
+set -eu
+cd /opt/cidade-tech
+docker compose exec -T oracle bash -lc "sqlplus -s / as sysdba <<'SQL'
+SET PAGESIZE 50
+SELECT COUNT(*) AS TOTAL_CONSULTAS FROM CIDADETECH_APP.TB_CT_CONSULTA;
+SELECT COUNT(*) AS TOTAL_VOTOS FROM CIDADETECH_APP.TB_CT_VOTO;
+EXIT
+SQL"
+'@
+
+az vm run-command invoke `
+  --resource-group $resourceGroup `
+  --name $vmName `
+  --command-id RunShellScript `
+  --scripts $selectDatabaseScript `
+  --output table
+
+11. TESTAR A API (APOS CONFIRMAR AS ROTAS)
+-----------------------------------------
+Obtenha o IP publico:
+
+$publicIp = az network public-ip show `
+  --resource-group $resourceGroup `
+  --name $publicIpName `
+  --query ipAddress `
+  --output tsv
+
+Confira no README da API os endpoints reais de CRUD e use Invoke-RestMethod para
+demonstrar GET, POST, PUT e DELETE. Exemplo somente quando a rota /api/consultas
+for confirmada:
+
+Invoke-RestMethod -Uri "http://$($publicIp):8080/api/consultas"
+
+12. LIMPEZA OPCIONAL DOS RECURSOS AZURE
+---------------------------------------
+ATENCAO: esta operacao exclui a VM e os recursos deste projeto no Resource Group.
+Confirme o nome e faca backup antes de executa-la. Nao exclui grupos alheios.
+
+az group delete --name $resourceGroup --yes --no-wait

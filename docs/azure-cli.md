@@ -4,6 +4,11 @@ Este roteiro cria os recursos de infraestrutura para a demonstração. **Ele nã
 foi executado** e não cria a API ou instala o Compose. Criar uma VM pode gerar
 custos; confirme assinatura, região, tamanho e IP permitido antes de executar.
 
+Para consultar e copiar a sequencia completa de comandos, incluindo a instalacao
+do Docker pela Azure Run Command e as verificacoes da VM, use
+[`azure-cli-comandos.txt`](../azure-cli-comandos.txt). Este documento explica as
+etapas e a arquitetura do provisionamento.
+
 Os comandos abaixo são PowerShell. Troque o IP de exemplo pelo IP público atual
 do avaliador. O acesso externo à API será HTTP/TCP 8080, restrito a esse IP.
 Não há regra SSH pública.

@@ -15,7 +15,8 @@ nomeado preserva os arquivos do Oracle entre reinícios dos containers.
 
 O diagrama com os recursos Azure e as decisões de rede está em
 [docs/arquitetura.md](docs/arquitetura.md). Os comandos para provisionar a
-infraestrutura estão em [docs/azure-cli.md](docs/azure-cli.md).
+infraestrutura estão em [docs/azure-cli.md](docs/azure-cli.md); o roteiro
+copiável em texto simples está em [azure-cli-comandos.txt](azure-cli-comandos.txt).
 
 ## Estado do trabalho
 
@@ -86,6 +87,8 @@ O contrato deverá ser conferido com o responsável pela API antes da integraç�
 ## Entrega
 
 O provisionamento, o desenho da infraestrutura e o roteiro de validação estão
-documentados em `docs/`. O vídeo final deverá mostrar os recursos Azure,
+documentados em `docs/` e em `azure-cli-comandos.txt`. No vídeo final, mostre os
+recursos Azure e a solução funcionando; use o arquivo TXT como referência para
+os comandos executados. O vídeo deverá mostrar
 containers, logs, CRUD e consulta direta ao Oracle, conforme o roteiro da
 disciplina.
