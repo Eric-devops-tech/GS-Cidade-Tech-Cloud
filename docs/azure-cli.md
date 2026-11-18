@@ -4,8 +4,8 @@ Este roteiro cria os recursos de infraestrutura para a demonstração. **Ele nã
 foi executado** e não cria a API ou instala o Compose. Criar uma VM pode gerar
 custos; confirme assinatura, região, tamanho e IP permitido antes de executar.
 
-Para consultar e copiar a sequencia completa de comandos, incluindo a instalacao
-do Docker pela Azure Run Command e as verificacoes da VM, use
+Para consultar e copiar a sequência completa de comandos, incluindo a instalação
+do Docker pela Azure Run Command e as verificações da VM, use
 [`azure-cli-comandos.txt`](../azure-cli-comandos.txt). Este documento explica as
 etapas e a arquitetura do provisionamento.
 

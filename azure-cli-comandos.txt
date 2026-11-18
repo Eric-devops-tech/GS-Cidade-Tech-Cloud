@@ -4,23 +4,23 @@ Global Solution 2026/2 - DevOps Tools & Cloud Computing
 COMO USAR
 ----------
 Os comandos Azure CLI abaixo foram escritos para PowerShell no Windows.
-Execute uma secao de cada vez e confira a saida antes de continuar.
+Execute uma seção de cada vez e confira a saída antes de continuar.
 As linhas iniciadas por # sao comentarios, nao comandos.
 
 ATENCAO
 -------
 - Este roteiro provisiona recursos Azure que podem gerar custos.
 - Os comandos ainda nao foram executados nesta assinatura.
-- Confirme a assinatura e a disponibilidade do tamanho da VM na regiao.
-- Substitua 203.0.113.10/32 pelo IP publico real autorizado antes de criar a NSG.
-  Esse IP e apenas um exemplo reservado e nao permite acesso a aplicacao.
-- Nao abra a porta 1521 do Oracle nem a porta 22 do SSH para a Internet.
+- Confirme a assinatura e a disponibilidade do tamanho da VM na região.
+- Substitua 203.0.113.10/32 pelo IP público real autorizado antes de criar a NSG.
+  Esse IP é apenas um exemplo reservado e não permite acesso à aplicação.
+- Não abra a porta 1521 do Oracle nem a porta 22 do SSH para a Internet.
 - A VM usa Azure Run Command para administracao, sem SSH publico.
-- A API Java ainda esta pendente. Os comandos da API nesta lista so devem ser
-  executados depois que o codigo e o Dockerfile forem integrados neste repositorio.
-- Nunca coloque senhas reais em comandos, no Git, em capturas de tela ou no video.
-- A remocao do Resource Group no final e opcional e destrutiva. Confira o nome
-  e faca backup antes de executa-la.
+- A API Java ainda está pendente. Os comandos da API nesta lista só devem ser
+  executados depois que o código e o Dockerfile forem integrados neste repositório.
+- Nunca coloque senhas reais em comandos, no Git, em capturas de tela ou no vídeo.
+- A remoção do Resource Group no final é opcional e destrutiva. Confira o nome
+  e faça backup antes de executá-la.
 
 1. LOGIN, ASSINATURA E VARIAVEIS
 --------------------------------
@@ -81,8 +81,8 @@ az network vnet subnet update `
   --name $subnetName `
   --network-security-group $nsgName
 
-A NSG e aplicada a subnet. A regra de negacao padrao bloqueia outras conexoes
-de entrada. Nao crie regras para Oracle 1521 ou SSH 22.
+A NSG é aplicada à subnet. A regra de negação padrão bloqueia outras conexões
+de entrada. Não crie regras para Oracle 1521 ou SSH 22.
 
 4. PUBLIC IP, NIC E MAQUINA VIRTUAL
 -----------------------------------
@@ -114,8 +114,8 @@ az vm create `
   --nsg-rule NONE `
   --tags project=CidadeTech purpose=academic-demo
 
-Confirme preco e disponibilidade de Standard_B2s_v2 em chilecentral antes de
-executar. A Oracle Free e a API compartilham a memoria da VM.
+Confirme preço e disponibilidade de Standard_B2s_v2 em chilecentral antes de
+executar. A Oracle Free e a API compartilham a memória da VM.
 
 5. INSTALAR DOCKER ENGINE E COMPOSE NA VM
 -----------------------------------------
@@ -147,8 +147,8 @@ az vm run-command invoke `
 
 6. BAIXAR O PROJETO E INICIAR O ORACLE
 --------------------------------------
-O script cria credenciais aleatorias diretamente na VM e grava o arquivo .env
-com permissao restrita. As senhas nao sao exibidas na saida do Azure CLI.
+O script cria credenciais aleatórias diretamente na VM e grava o arquivo .env
+com permissão restrita. As senhas não são exibidas na saída do Azure CLI.
 
 $deployOracleScript = @'
 set -eu
@@ -160,8 +160,8 @@ fi
 cd /opt/cidade-tech
 if [ ! -f .env ]; then
   umask 077
-  ORACLE_PASSWORD=$(openssl rand -hex 24)
-  APP_DB_PASSWORD=$(openssl rand -hex 24)
+  ORACLE_PASSWORD="C$(openssl rand -hex 24)z9"
+  APP_DB_PASSWORD="A$(openssl rand -hex 24)z7"
   printf 'ORACLE_PASSWORD=%s\nAPP_DB_USER=CIDADETECH_APP\nAPP_DB_PASSWORD=%s\n' "$ORACLE_PASSWORD" "$APP_DB_PASSWORD" > .env
 fi
 docker compose up -d --wait --wait-timeout 600 oracle
@@ -175,8 +175,8 @@ az vm run-command invoke `
   --scripts $deployOracleScript `
   --output table
 
-O volume oracle-data mantem os arquivos do Oracle entre reinicios do container.
-A porta 1521 nao e publicada na VM; o banco so e acessivel pela rede do Compose.
+O volume oracle-data mantém os arquivos do Oracle entre reinícios do container.
+A porta 1521 não é publicada na VM; o banco só é acessível pela rede do Compose.
 
 7. INTEGRAR E SUBIR A API JAVA (PENDENTE DA ENTREGA DA API)
 -----------------------------------------------------------
@@ -200,7 +200,7 @@ az vm run-command invoke `
   --output table
 
 O endpoint do CRUD depende das rotas que forem implementadas na API. Atualize
-este arquivo e o README com os endpoints reais antes de gravar o video.
+este arquivo e o README com os endpoints reais antes de gravar o vídeo.
 
 8. VERIFICAR RECURSOS AZURE
 ---------------------------
@@ -245,10 +245,10 @@ az vm run-command invoke `
   --scripts $inspectContainersScript `
   --output table
 
-Quando a API estiver integrada, acrescente a evidencia dos logs da aplicacao:
+Quando a API estiver integrada, acrescente a evidência dos logs da aplicação:
 docker compose logs --tail=100 api
 
-10. CONSULTA DIRETA AO ORACLE (APOS CRIAR E CARREGAR AS TABELAS)
+10. CONSULTA DIRETA AO ORACLE (APÓS CRIAR E CARREGAR AS TABELAS)
 ---------------------------------------------------------------
 O comando executa SQL*Plus dentro do container Oracle, sem publicar a porta
 1521. Execute somente depois que as tabelas do projeto tiverem sido criadas.
@@ -273,7 +273,7 @@ az vm run-command invoke `
 
 11. TESTAR A API (APOS CONFIRMAR AS ROTAS)
 -----------------------------------------
-Obtenha o IP publico:
+Obtenha o IP público:
 
 $publicIp = az network public-ip show `
   --resource-group $resourceGroup `
@@ -289,7 +289,7 @@ Invoke-RestMethod -Uri "http://$($publicIp):8080/api/consultas"
 
 12. LIMPEZA OPCIONAL DOS RECURSOS AZURE
 ---------------------------------------
-ATENCAO: esta operacao exclui a VM e os recursos deste projeto no Resource Group.
-Confirme o nome e faca backup antes de executa-la. Nao exclui grupos alheios.
+ATENÇÃO: esta operação exclui a VM e os recursos deste projeto no Resource Group.
+Confirme o nome e faça backup antes de executá-la. Não exclui grupos alheios.
 
 az group delete --name $resourceGroup --yes --no-wait

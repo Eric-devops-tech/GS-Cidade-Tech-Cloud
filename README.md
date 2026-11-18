@@ -89,6 +89,5 @@ O contrato deverá ser conferido com o responsável pela API antes da integraç�
 O provisionamento, o desenho da infraestrutura e o roteiro de validação estão
 documentados em `docs/` e em `azure-cli-comandos.txt`. No vídeo final, mostre os
 recursos Azure e a solução funcionando; use o arquivo TXT como referência para
-os comandos executados. O vídeo deverá mostrar
-containers, logs, CRUD e consulta direta ao Oracle, conforme o roteiro da
-disciplina.
+os comandos executados. O vídeo deverá mostrar containers, logs, CRUD e consulta
+direta ao Oracle, conforme o roteiro da disciplina.
