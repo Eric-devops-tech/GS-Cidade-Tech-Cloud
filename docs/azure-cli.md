@@ -1,17 +1,23 @@
 # Azure CLI — provisionamento da rede e da VM
 
-Este roteiro descreve o provisionamento da infraestrutura para a demonstração.
-**Ele não foi executado**. Criar uma VM pode gerar custos; confirme assinatura,
-região, tamanho e IP permitido antes de executar.
+O ambiente Cidade Tech está provisionado na assinatura Azure for Students, no
+Resource Group `rg-cidade-tech`, região `chilecentral`. A VM `vm-cidade-tech`
+usa Ubuntu 22.04 e `Standard_B2s_v2`; Docker Compose executa a API e o PostgreSQL.
+A NSG permite somente TCP/8080 do IPv4 autorizado. Não há regra de entrada para
+SSH ou PostgreSQL. Os recursos ativos podem consumir créditos enquanto estiverem
+ligados.
 
 Para consultar e copiar a sequência completa de comandos, incluindo a instalação
 do Docker pela Azure Run Command e as verificações da VM, use
 [`azure-cli-comandos.txt`](../azure-cli-comandos.txt). Este documento explica as
-etapas e a arquitetura do provisionamento.
+etapas e a arquitetura do provisionamento. Não repita as etapas de criação
+enquanto esses recursos existirem. A URL da API é `http://<IP-PUBLICO>:8080`;
+consulte o IP atual com Azure CLI, sem registrá-lo junto ao IPv4 autorizado.
 
-Os comandos abaixo são PowerShell. Troque o IP de exemplo pelo IP público atual
-do avaliador. O acesso externo à API será HTTP/TCP 8080, restrito a esse IP.
-Não há regra SSH pública.
+Os comandos abaixo são PowerShell. Informe o IPv4 público atual que deve acessar
+a aplicação; o sufixo `/32` restringe a regra a esse endereço. Não registre o IP
+em arquivos públicos. O acesso externo à API será HTTP/TCP 8080. Não há regra
+SSH pública.
 
 ## 1. Login e variáveis
 
@@ -27,7 +33,13 @@ $nsgName = "nsg-cidade-tech"
 $publicIpName = "pip-cidade-tech"
 $nicName = "nic-cidade-tech"
 $vmName = "vm-cidade-tech"
-$allowedIp = "203.0.113.10/32" # Substitua pelo IP público autorizado
+$clientIp = Read-Host "IPv4 público autorizado (somente o endereço, sem /)"
+$parsedIp = $null
+if (-not [System.Net.IPAddress]::TryParse($clientIp, [ref]$parsedIp) -or
+    $parsedIp.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork) {
+  throw "Informe um endereço IPv4 válido."
+}
+$allowedIp = "$($parsedIp.IPAddressToString)/32"
 ```
 
 ## 2. Resource Group, VNet e subnet
@@ -140,6 +152,20 @@ az vm run-command invoke `
   --name $vmName `
   --command-id RunShellScript `
   --scripts "cd /opt/cidade-tech && docker compose ps"
+```
+
+As credenciais aleatórias do gestor inicial ficam em
+`/root/cidade-tech-manager.txt`, legíveis somente por root. Consulte-as antes da
+gravação usando Azure Run Command; não compartilhe nem grave a saída:
+
+```powershell
+az vm run-command invoke `
+  --resource-group $resourceGroup `
+  --name $vmName `
+  --command-id RunShellScript `
+  --scripts "cat /root/cidade-tech-manager.txt" `
+  --query "value[0].message" `
+  --output tsv
 ```
 
 Antes de remover os recursos, confira o nome do grupo e faça backup de qualquer

@@ -10,10 +10,11 @@ As linhas iniciadas por # sao comentarios, nao comandos.
 ATENCAO
 -------
 - Este roteiro provisiona recursos Azure que podem gerar custos.
-- Os comandos ainda nao foram executados nesta assinatura.
-- Confirme a assinatura e a disponibilidade do tamanho da VM na região.
-- Substitua 203.0.113.10/32 pelo IP público real autorizado antes de criar a NSG.
-  Esse IP é apenas um exemplo reservado e não permite acesso à aplicação.
+- O ambiente Cidade Tech ja foi provisionado na assinatura Azure for Students.
+- Nao repita as etapas 2 a 4 enquanto os recursos deste Resource Group existirem.
+- A VM fica ligada e pode consumir creditos enquanto permanecer ativa.
+- Informe seu IPv4 público atual na variável $clientIp antes de criar a NSG.
+  A regra usa /32 para permitir somente esse endereço; não publique seu IP no Git.
 - Não abra a porta 5432 do PostgreSQL nem a porta 22 do SSH para a Internet.
 - A VM usa Azure Run Command para administracao, sem SSH publico.
 - A API Java e o Dockerfile já estão integrados em api/. Siga as etapas 5 e 6
@@ -36,7 +37,13 @@ $nsgName = "nsg-cidade-tech"
 $publicIpName = "pip-cidade-tech"
 $nicName = "nic-cidade-tech"
 $vmName = "vm-cidade-tech"
-$allowedIp = "203.0.113.10/32" # Troque pelo IP real autorizado
+$clientIp = Read-Host "IPv4 público autorizado (somente o endereço, sem /)"
+$parsedIp = $null
+if (-not [System.Net.IPAddress]::TryParse($clientIp, [ref]$parsedIp) -or
+    $parsedIp.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork) {
+  throw "Informe um endereço IPv4 válido."
+}
+$allowedIp = "$($parsedIp.IPAddressToString)/32"
 
 2. RESOURCE GROUP, VNET E SUBNET
 --------------------------------
@@ -148,9 +155,9 @@ az vm run-command invoke `
 6. BAIXAR O PROJETO E INICIAR POSTGRESQL E API
 ----------------------------------------------
 O script cria credenciais aleatórias diretamente na VM, grava o arquivo .env
-com permissão restrita e inicializa o gestor. Na primeira execução, a saída
-inclui a senha inicial do gestor. Execute antes de gravar o vídeo, guarde essa
-senha em local privado e não compartilhe a saída do Azure CLI.
+com permissão restrita e inicializa o gestor. A credencial do gestor fica em
+/root/cidade-tech-manager.txt, legível somente por root; ela não é impressa
+durante o deploy.
 
 $deployProjectScript = @'
 set -eu
@@ -175,12 +182,14 @@ if [ ! -f .manager-initialized ]; then
     sed -i '/^GESTOR_INICIAL_EMAIL=/d; /^GESTOR_INICIAL_SENHA=/d' .env
     printf 'GESTOR_INICIAL_EMAIL=%s\nGESTOR_INICIAL_SENHA=%s\n' "$MANAGER_EMAIL" "$MANAGER_PASSWORD" >> .env
   fi
+  umask 077
+  printf 'email=%s\npassword=%s\n' "$MANAGER_EMAIL" "$MANAGER_PASSWORD" > /root/cidade-tech-manager.txt
+  chmod 600 /root/cidade-tech-manager.txt
 fi
 chmod 600 .env
 docker compose up -d --build --wait --wait-timeout 600
 docker compose ps
 if [ ! -f .manager-initialized ]; then
-  printf 'Initial manager email: %s\nInitial manager password: %s\n' "$MANAGER_EMAIL" "$MANAGER_PASSWORD"
   sed -i '/^GESTOR_INICIAL_EMAIL=/d; /^GESTOR_INICIAL_SENHA=/d' .env
   touch .manager-initialized
 fi
@@ -192,6 +201,17 @@ az vm run-command invoke `
   --command-id RunShellScript `
   --scripts $deployProjectScript `
   --output table
+
+Para consultar a credencial do gestor antes da gravação, execute este comando
+em uma sessão privada. A saída contém uma senha; não a compartilhe nem grave:
+
+az vm run-command invoke `
+  --resource-group $resourceGroup `
+  --name $vmName `
+  --command-id RunShellScript `
+  --scripts "cat /root/cidade-tech-manager.txt" `
+  --query "value[0].message" `
+  --output tsv
 
 O volume postgres-data mantém os dados entre reinícios do container. A porta
 5432 não é publicada na VM; o banco só é acessível pela rede do Compose.

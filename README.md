@@ -29,13 +29,17 @@ O diagrama de infraestrutura Azure e as decisões estão em
 - [x] Testes da API: `mvn clean verify` passou com nove testes de integração.
 - [x] Compose Cloud para API e PostgreSQL; o banco não publica porta no host.
 - [x] Diagrama Azure e comandos de provisionamento documentados.
-- [ ] Executar o Compose integrado e demonstrar CRUD e SQL após iniciar o Docker
-  Engine.
-- [ ] Provisionar a VM Azure, validar o acesso e gravar o vídeo da entrega.
+- [x] Compose integrado executado localmente; API e PostgreSQL iniciaram e o
+  endpoint de saúde respondeu `UP`.
+- [x] VM `Standard_B2s_v2` provisionada em `chilecentral`; NSG permite somente
+  TCP/8080 do IPv4 autorizado. SSH e PostgreSQL não estão expostos.
+- [x] API validada na VM: saúde `UP`, leitura pública HTTP 200, autenticação de
+  gestor, criação/abertura de consulta e persistência confirmada no PostgreSQL.
+- [ ] Gravar o vídeo da entrega e demonstrar o fluxo completo.
 
 O relatório entregue junto da API também registra a migration e os fluxos de
-persistência PostgreSQL verificados pelo grupo Java. Neste ambiente, ainda não
-foi possível subir os containers porque o Docker Engine não está ativo.
+persistência PostgreSQL verificados pelo grupo Java. Os recursos Azure ativos
+podem gerar custos enquanto permanecerem ligados.
 
 ## Executar localmente
 
@@ -98,7 +102,7 @@ versionada em `api/src/main/resources/db/migration/`.
 
 - A porta PostgreSQL 5432 não é publicada; somente a API conecta-se ao banco
   pela rede Docker.
-- A NSG do Azure deve permitir TCP/8080 somente do IP autorizado do avaliador.
+- A NSG do Azure permite TCP/8080 somente do IPv4 autorizado; a regra usa `/32`.
 - A VM não precisa de SSH público; use Azure Run Command para administração.
 - Use somente dados sintéticos. O sistema não verifica identidade civil nem
   residência e não deve ser apresentado como votação oficial.
