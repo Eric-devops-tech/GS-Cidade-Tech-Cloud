@@ -14,10 +14,10 @@ ATENCAO
 - Confirme a assinatura e a disponibilidade do tamanho da VM na região.
 - Substitua 203.0.113.10/32 pelo IP público real autorizado antes de criar a NSG.
   Esse IP é apenas um exemplo reservado e não permite acesso à aplicação.
-- Não abra a porta 1521 do Oracle nem a porta 22 do SSH para a Internet.
+- Não abra a porta 5432 do PostgreSQL nem a porta 22 do SSH para a Internet.
 - A VM usa Azure Run Command para administracao, sem SSH publico.
-- A API Java ainda está pendente. Os comandos da API nesta lista só devem ser
-  executados depois que o código e o Dockerfile forem integrados neste repositório.
+- A API Java e o Dockerfile já estão integrados em api/. Siga as etapas 5 e 6
+  para instalar o Docker na VM e implantar a API com o PostgreSQL.
 - Nunca coloque senhas reais em comandos, no Git, em capturas de tela ou no vídeo.
 - A remoção do Resource Group no final é opcional e destrutiva. Confira o nome
   e faça backup antes de executá-la.
@@ -82,7 +82,7 @@ az network vnet subnet update `
   --network-security-group $nsgName
 
 A NSG é aplicada à subnet. A regra de negação padrão bloqueia outras conexões
-de entrada. Não crie regras para Oracle 1521 ou SSH 22.
+de entrada. Não crie regras para PostgreSQL 5432 ou SSH 22.
 
 4. PUBLIC IP, NIC E MAQUINA VIRTUAL
 -----------------------------------
@@ -115,7 +115,7 @@ az vm create `
   --tags project=CidadeTech purpose=academic-demo
 
 Confirme preço e disponibilidade de Standard_B2s_v2 em chilecentral antes de
-executar. A Oracle Free e a API compartilham a memória da VM.
+executar. O PostgreSQL e a API compartilham a memória da VM.
 
 5. INSTALAR DOCKER ENGINE E COMPOSE NA VM
 -----------------------------------------
@@ -145,12 +145,14 @@ az vm run-command invoke `
   --scripts $bootstrapScript `
   --output table
 
-6. BAIXAR O PROJETO E INICIAR O ORACLE
---------------------------------------
-O script cria credenciais aleatórias diretamente na VM e grava o arquivo .env
-com permissão restrita. As senhas não são exibidas na saída do Azure CLI.
+6. BAIXAR O PROJETO E INICIAR POSTGRESQL E API
+----------------------------------------------
+O script cria credenciais aleatórias diretamente na VM, grava o arquivo .env
+com permissão restrita e inicializa o gestor. Na primeira execução, a saída
+inclui a senha inicial do gestor. Execute antes de gravar o vídeo, guarde essa
+senha em local privado e não compartilhe a saída do Azure CLI.
 
-$deployOracleScript = @'
+$deployProjectScript = @'
 set -eu
 if [ ! -d /opt/cidade-tech/.git ]; then
   git clone https://github.com/Eric-devops-tech/GS-Cidade-Tech-Cloud.git /opt/cidade-tech
@@ -158,39 +160,53 @@ else
   git -C /opt/cidade-tech pull --ff-only
 fi
 cd /opt/cidade-tech
-if [ ! -f .env ]; then
+if [ ! -s .env ] || ! grep -q '^DB_PASSWORD=.' .env; then
   umask 077
-  ORACLE_PASSWORD="C$(openssl rand -hex 24)z9"
-  APP_DB_PASSWORD="A$(openssl rand -hex 24)z7"
-  printf 'ORACLE_PASSWORD=%s\nAPP_DB_USER=CIDADETECH_APP\nAPP_DB_PASSWORD=%s\n' "$ORACLE_PASSWORD" "$APP_DB_PASSWORD" > .env
+  DB_PASSWORD=$(openssl rand -hex 24)
+  JWT_SECRET=$(openssl rand -hex 32)
+  printf 'DB_PASSWORD=%s\nJWT_SECRET=%s\nCORS_ORIGINS=http://localhost:8081\n' "$DB_PASSWORD" "$JWT_SECRET" > .env
 fi
-docker compose up -d --wait --wait-timeout 600 oracle
+if [ ! -f .manager-initialized ]; then
+  MANAGER_EMAIL=$(sed -n 's/^GESTOR_INICIAL_EMAIL=//p' .env)
+  MANAGER_PASSWORD=$(sed -n 's/^GESTOR_INICIAL_SENHA=//p' .env)
+  if [ -z "$MANAGER_EMAIL" ] || [ -z "$MANAGER_PASSWORD" ]; then
+    MANAGER_EMAIL="gestor@cidade-tech.demo"
+    MANAGER_PASSWORD="C$(openssl rand -hex 10)z9"
+    sed -i '/^GESTOR_INICIAL_EMAIL=/d; /^GESTOR_INICIAL_SENHA=/d' .env
+    printf 'GESTOR_INICIAL_EMAIL=%s\nGESTOR_INICIAL_SENHA=%s\n' "$MANAGER_EMAIL" "$MANAGER_PASSWORD" >> .env
+  fi
+fi
+chmod 600 .env
+docker compose up -d --build --wait --wait-timeout 600
 docker compose ps
+if [ ! -f .manager-initialized ]; then
+  printf 'Initial manager email: %s\nInitial manager password: %s\n' "$MANAGER_EMAIL" "$MANAGER_PASSWORD"
+  sed -i '/^GESTOR_INICIAL_EMAIL=/d; /^GESTOR_INICIAL_SENHA=/d' .env
+  touch .manager-initialized
+fi
 '@
 
 az vm run-command invoke `
   --resource-group $resourceGroup `
   --name $vmName `
   --command-id RunShellScript `
-  --scripts $deployOracleScript `
+  --scripts $deployProjectScript `
   --output table
 
-O volume oracle-data mantém os arquivos do Oracle entre reinícios do container.
-A porta 1521 não é publicada na VM; o banco só é acessível pela rede do Compose.
+O volume postgres-data mantém os dados entre reinícios do container. A porta
+5432 não é publicada na VM; o banco só é acessível pela rede do Compose.
 
-7. INTEGRAR E SUBIR A API JAVA (PENDENTE DA ENTREGA DA API)
------------------------------------------------------------
-Executar somente depois que a API e o Dockerfile estiverem em api/, configurados
-para JDBC oracle:1521/FREEPDB1 e integrados ao repositório. O esquema simples do
-Cloud deve ser o combinado com a equipe Java; não use automaticamente os scripts
-e as rotinas PL/SQL da entrega separada da disciplina Database.
+7. ATUALIZAR A APLICAÇÃO APÓS NOVAS ALTERAÇÕES
+-----------------------------------------------
+Execute depois de publicar mudanças na branch main. Esse comando atualiza a API
+e recria o container sem apagar o volume persistente do PostgreSQL.
 
 $deployApplicationScript = @'
 set -eu
 git -C /opt/cidade-tech pull --ff-only
 cd /opt/cidade-tech
 test -f api/Dockerfile
-docker compose --profile application up -d --build --wait --wait-timeout 600
+docker compose up -d --build --wait --wait-timeout 600
 docker compose ps
 '@
 
@@ -201,8 +217,7 @@ az vm run-command invoke `
   --scripts $deployApplicationScript `
   --output table
 
-O endpoint do CRUD depende das rotas que forem implementadas na API. Atualize
-este arquivo e o README com os endpoints reais antes de gravar o vídeo.
+Consulte api/README.md para o contrato e as rotas reais do CRUD.
 
 8. VERIFICAR RECURSOS AZURE
 ---------------------------
@@ -237,7 +252,8 @@ cd /opt/cidade-tech
 docker --version
 docker compose version
 docker compose ps
-docker compose logs --tail=100 oracle
+docker compose logs --tail=100 database
+docker compose logs --tail=100 api
 '@
 
 az vm run-command invoke `
@@ -247,27 +263,16 @@ az vm run-command invoke `
   --scripts $inspectContainersScript `
   --output table
 
-Quando a API estiver integrada, acrescente a evidência dos logs da aplicação:
-docker compose logs --tail=100 api
-
-10. CONSULTA DIRETA AO ORACLE (APÓS A API CRIAR AS TABELAS)
------------------------------------------------------------
-O comando executa SQL*Plus dentro do container Oracle, sem publicar a porta
-1521. Esta consulta genérica lista as tabelas do usuário da aplicação; depois
-que seu amigo confirmar os nomes e as colunas, acrescente um SELECT que mostre
-registros da tabela relacionada usada pela API.
+10. CONSULTA DIRETA AO POSTGRESQL
+---------------------------------
+O comando executa psql dentro do container do banco. A porta 5432 não é
+publicada na VM. Os SELECTs leem dados que a API Java persistiu.
 
 $selectDatabaseScript = @'
 set -eu
 cd /opt/cidade-tech
-docker compose exec -T oracle bash -lc "sqlplus -s / as sysdba <<'SQL'
-SET PAGESIZE 50
-SELECT table_name
-FROM dba_tables
-WHERE owner = 'CIDADETECH_APP'
-ORDER BY table_name;
-EXIT
-SQL"
+docker compose exec -T database psql -U empauta -d empauta -c "SELECT id, titulo, bairro, estado FROM consultas ORDER BY id;"
+docker compose exec -T database psql -U empauta -d empauta -c "SELECT consulta_id, usuario_id, escolha FROM votos ORDER BY id;"
 '@
 
 az vm run-command invoke `
@@ -277,7 +282,7 @@ az vm run-command invoke `
   --scripts $selectDatabaseScript `
   --output table
 
-11. TESTAR A API (APOS CONFIRMAR AS ROTAS)
+11. TESTAR A API
 -----------------------------------------
 Obtenha o IP público:
 
@@ -287,11 +292,10 @@ $publicIp = az network public-ip show `
   --query ipAddress `
   --output tsv
 
-Confira no README da API os endpoints reais de CRUD e use Invoke-RestMethod para
-demonstrar GET, POST, PUT e DELETE. Exemplo somente quando a rota /api/consultas
-for confirmada:
+Abra o Swagger em /swagger-ui.html e siga os exemplos de autenticação e CRUD em
+api/README.md. Este GET público confirma que a API responde:
 
-Invoke-RestMethod -Uri "http://$($publicIp):8080/api/consultas"
+Invoke-RestMethod -Uri "http://$($publicIp):8080/api/temas"
 
 12. LIMPEZA OPCIONAL DOS RECURSOS AZURE
 ---------------------------------------

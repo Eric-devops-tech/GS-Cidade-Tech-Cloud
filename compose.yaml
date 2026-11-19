@@ -1,38 +1,42 @@
 services:
-  oracle:
-    image: gvenzl/oracle-free:23.26.3-slim
+  database:
+    image: postgres:17
     environment:
-      ORACLE_PASSWORD: ${ORACLE_PASSWORD:?Defina ORACLE_PASSWORD no arquivo .env}
-      APP_USER: ${APP_DB_USER:?Defina APP_DB_USER no arquivo .env}
-      APP_USER_PASSWORD: ${APP_DB_PASSWORD:?Defina APP_DB_PASSWORD no arquivo .env}
+      POSTGRES_DB: empauta
+      POSTGRES_USER: empauta
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no arquivo .env}
     volumes:
-      - oracle-data:/opt/oracle/oradata
+      - postgres-data:/var/lib/postgresql/data
     networks:
       - cidade-tech
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "healthcheck.sh"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U empauta -d empauta"]
+      interval: 5s
       timeout: 5s
-      retries: 20
-      start_period: 120s
+      retries: 15
+      start_period: 10s
 
   api:
-    profiles:
-      - application
     build:
       context: ./api
     image: cidade-tech-api:local
     environment:
-      SPRING_DATASOURCE_URL: jdbc:oracle:thin:@oracle:1521/FREEPDB1
-      SPRING_DATASOURCE_USERNAME: ${APP_DB_USER:?Defina APP_DB_USER no arquivo .env}
-      SPRING_DATASOURCE_PASSWORD: ${APP_DB_PASSWORD:?Defina APP_DB_PASSWORD no arquivo .env}
+      SPRING_PROFILES_ACTIVE: postgres
+      DB_URL: jdbc:postgresql://database:5432/empauta
+      DB_USER: empauta
+      DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no arquivo .env}
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET no arquivo .env}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8081}
+      GESTOR_INICIAL_EMAIL: ${GESTOR_INICIAL_EMAIL:-}
+      GESTOR_INICIAL_SENHA: ${GESTOR_INICIAL_SENHA:-}
+      SERVER_ADDRESS: 0.0.0.0
     ports:
       - "8080:8080"
     networks:
       - cidade-tech
     depends_on:
-      oracle:
+      database:
         condition: service_healthy
     restart: unless-stopped
 
@@ -41,4 +45,4 @@ networks:
     driver: bridge
 
 volumes:
-  oracle-data:
+  postgres-data:

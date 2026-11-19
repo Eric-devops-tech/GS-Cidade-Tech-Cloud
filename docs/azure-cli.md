@@ -1,8 +1,8 @@
 # Azure CLI — provisionamento da rede e da VM
 
-Este roteiro cria os recursos de infraestrutura para a demonstração. **Ele não
-foi executado** e não cria a API ou instala o Compose. Criar uma VM pode gerar
-custos; confirme assinatura, região, tamanho e IP permitido antes de executar.
+Este roteiro descreve o provisionamento da infraestrutura para a demonstração.
+**Ele não foi executado**. Criar uma VM pode gerar custos; confirme assinatura,
+região, tamanho e IP permitido antes de executar.
 
 Para consultar e copiar a sequência completa de comandos, incluindo a instalação
 do Docker pela Azure Run Command e as verificações da VM, use
@@ -75,7 +75,7 @@ az network vnet subnet update `
   --network-security-group $nsgName
 ```
 
-Não crie uma regra de entrada para 1521 ou SSH. A regra de negação padrão da
+Não crie uma regra de entrada para 5432 ou SSH. A regra de negação padrão da
 NSG bloqueia as demais conexões de entrada.
 
 ## 4. Public IP, NIC e VM
@@ -111,7 +111,7 @@ az vm create `
 
 O tamanho indicado (2 vCPU/8 GiB no ambiente usado anteriormente pelo grupo)
 deve ser confirmado quanto à disponibilidade e ao custo na região antes de
-executar. A Oracle Free e a API compartilham a memória da VM.
+executar. O PostgreSQL e a API compartilham a memória da VM.
 
 ## 5. Conferir os recursos e o IP
 
@@ -126,9 +126,9 @@ az network public-ip show `
   --output tsv
 ```
 
-Depois que a API estiver implantada, valide o CRUD pelo endereço
+Depois de executar a implantação descrita em `azure-cli-comandos.txt`, valide o CRUD pelo endereço
 `http://<IP-PUBLICO>:8080` e mostre `docker compose ps`, logs dos containers e
-uma consulta SQL executada diretamente no Oracle.
+consultas SQL executadas diretamente no PostgreSQL.
 
 ## 6. Administração e limpeza
 

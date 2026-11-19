@@ -1,0 +1,9 @@
+# Roteiro do pitch — até 5 minutos
+
+- **0:00–0:45 — Problema.** Explique o caso de um morador que quer saber quais melhorias estão em discussão e como terminou a consulta. Como evidência de que há demanda por canais digitais de participação, cite os mais de 4 milhões de acessos e 1,4 milhão de cidadãos participantes no [Brasil Participativo, PPA 2024–2027](https://brasilparticipativo.presidencia.gov.br/processes/programas/). Esse dado é do programa federal, não da plataforma do grupo. Se tiverem ouvido moradores reais, tragam uma fala autorizada e sem identificação.
+- **0:45–1:30 — Solução.** Apresente Cidade Tech: temas, propostas de bairro, um voto por conta e apuração aberta ao fim da consulta. Exemplifique com a travessia perto da escola.
+- **1:30–3:00 — Demonstração.** Mostre um gestor abrindo uma proposta, um cidadão encontrando-a por tema, votando e recebendo confirmação. Abra a apuração depois de encerrar. Priorize o app real consumindo a API; se ainda não estiver integrado, mostre a API ao vivo e descreva honestamente o estado.
+- **3:00–4:00 — Sustentação.** Proponha um piloto com associação de moradores e conselho local. Hipótese de financiamento: o parceiro institucional assume hospedagem e moderação; participação sem cobrança ao morador. Sem contratos ou parcerias confirmadas.
+- **4:00–5:00 — Impacto.** Proponha medir volume de participação, consultas encerradas com apuração e tempo de devolutiva. Relacione a proposta ao ODS 16, em especial decisão participativa. Diferencie metas de resultados já demonstrados. Termine com o benefício concreto: consultar e acompanhar o desfecho no mesmo lugar.
+
+Publiquem como vídeo público ou não listado no YouTube, ou Drive com acesso aberto. Confiram o link em aba anônima. Completem o README e a área de Java indicada no portal. O vídeo não acompanha o código.
