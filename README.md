@@ -112,8 +112,9 @@ versionada em `api/src/main/resources/db/migration/`.
 
 ## Entrega Cloud
 
-O vídeo gravado demonstra a arquitetura e os recursos Azure, os containers e
-seus logs, o CRUD pela API e consultas SQL diretamente no PostgreSQL. Para
-recriar o ambiente, siga [azure-cli-comandos.txt](azure-cli-comandos.txt) e
-informe o IPv4 público atual que deve acessar a API. Os comandos não criam
-recursos até serem executados.
+O vídeo da demonstração está disponível em
+[YouTube](https://youtu.be/NUwAUUpTeyk). Ele apresenta a arquitetura e os
+recursos Azure, os containers e seus logs, o CRUD pela API e consultas SQL
+diretamente no PostgreSQL. Para recriar o ambiente, siga
+[azure-cli-comandos.txt](azure-cli-comandos.txt) e informe o IPv4 público atual
+que deve acessar a API. Os comandos não criam recursos até serem executados.
