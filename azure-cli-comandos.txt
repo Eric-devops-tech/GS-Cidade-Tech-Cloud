@@ -10,8 +10,10 @@ As linhas iniciadas por # sao comentarios, nao comandos.
 ATENCAO
 -------
 - Este roteiro provisiona recursos Azure que podem gerar custos.
-- O ambiente Cidade Tech ja foi provisionado na assinatura Azure for Students.
-- Nao repita as etapas 2 a 4 enquanto os recursos deste Resource Group existirem.
+- O ambiente demonstrado no video foi excluido; o Resource Group nao esta ativo.
+- Para recriar, use uma assinatura ativa com permissao, cota e cobranca habilitada.
+- Os custos sao cobrados na assinatura; creditos disponiveis podem ser aplicados.
+- Se o Resource Group ja existir, inspecione-o antes de executar a criacao.
 - A VM fica ligada e pode consumir creditos enquanto permanecer ativa.
 - Informe seu IPv4 público atual na variável $clientIp antes de criar a NSG.
   A regra usa /32 para permitir somente esse endereço; não publique seu IP no Git.
@@ -28,6 +30,8 @@ ATENCAO
 
 az login
 az account show --output table
+# Selecione a assinatura que recebera os recursos, se necessario:
+# az account set --subscription "<nome ou ID da assinatura>"
 
 $resourceGroup = "rg-cidade-tech"
 $location = "chilecentral"
@@ -44,6 +48,26 @@ if (-not [System.Net.IPAddress]::TryParse($clientIp, [ref]$parsedIp) -or
   throw "Informe um endereço IPv4 válido."
 }
 $allowedIp = "$($parsedIp.IPAddressToString)/32"
+
+Os scripts Linux sao codificados em Base64 antes do Azure Run Command para
+preservar aspas e quebras de linha no PowerShell.
+
+function Invoke-CidadeTechVmScript {
+  param([Parameter(Mandatory = $true)][string]$Script)
+  $encodedScript = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Script))
+  $remoteCommand = "echo $encodedScript | base64 -d | bash"
+  $result = az vm run-command invoke `
+    --resource-group $resourceGroup `
+    --name $vmName `
+    --command-id RunShellScript `
+    --scripts $remoteCommand `
+    --query "value[0].message" `
+    --output tsv
+  if ($LASTEXITCODE -ne 0) {
+    throw "Azure Run Command falhou na VM $vmName."
+  }
+  $result
+}
 
 2. RESOURCE GROUP, VNET E SUBNET
 --------------------------------
@@ -131,26 +155,24 @@ Ele instala o Docker Engine e o plugin oficial Docker Compose.
 
 $bootstrapScript = @'
 set -eu
-apt-get update
-apt-get install -y ca-certificates curl git openssl
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq >> /var/log/cidade-tech-bootstrap.log 2>&1
+apt-get install -y -qq ca-certificates curl git openssl >> /var/log/cidade-tech-bootstrap.log 2>&1
 install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
 chmod a+r /etc/apt/keyrings/docker.asc
 . /etc/os-release
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $VERSION_CODENAME stable" > /etc/apt/sources.list.d/docker.list
-apt-get update
-apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+apt-get update -qq >> /var/log/cidade-tech-bootstrap.log 2>&1
+apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin >> /var/log/cidade-tech-bootstrap.log 2>&1
 systemctl enable --now docker
 docker --version
 docker compose version
+systemctl is-active docker
+echo "DOCKER_BOOTSTRAP_COMPLETE"
 '@
 
-az vm run-command invoke `
-  --resource-group $resourceGroup `
-  --name $vmName `
-  --command-id RunShellScript `
-  --scripts $bootstrapScript `
-  --output table
+Invoke-CidadeTechVmScript -Script $bootstrapScript
 
 6. BAIXAR O PROJETO E INICIAR POSTGRESQL E API
 ----------------------------------------------
@@ -187,7 +209,10 @@ if [ ! -f .manager-initialized ]; then
   chmod 600 /root/cidade-tech-manager.txt
 fi
 chmod 600 .env
-docker compose up -d --build --wait --wait-timeout 600
+if ! docker compose up -d --build --wait --wait-timeout 600 > /var/log/cidade-tech-deploy.log 2>&1; then
+  tail -n 60 /var/log/cidade-tech-deploy.log
+  exit 1
+fi
 docker compose ps
 if [ ! -f .manager-initialized ]; then
   sed -i '/^GESTOR_INICIAL_EMAIL=/d; /^GESTOR_INICIAL_SENHA=/d' .env
@@ -195,23 +220,12 @@ if [ ! -f .manager-initialized ]; then
 fi
 '@
 
-az vm run-command invoke `
-  --resource-group $resourceGroup `
-  --name $vmName `
-  --command-id RunShellScript `
-  --scripts $deployProjectScript `
-  --output table
+Invoke-CidadeTechVmScript -Script $deployProjectScript
 
 Para consultar a credencial do gestor antes da gravação, execute este comando
 em uma sessão privada. A saída contém uma senha; não a compartilhe nem grave:
 
-az vm run-command invoke `
-  --resource-group $resourceGroup `
-  --name $vmName `
-  --command-id RunShellScript `
-  --scripts "cat /root/cidade-tech-manager.txt" `
-  --query "value[0].message" `
-  --output tsv
+Invoke-CidadeTechVmScript -Script "cat /root/cidade-tech-manager.txt"
 
 O volume postgres-data mantém os dados entre reinícios do container. A porta
 5432 não é publicada na VM; o banco só é acessível pela rede do Compose.
@@ -226,16 +240,15 @@ set -eu
 git -C /opt/cidade-tech pull --ff-only
 cd /opt/cidade-tech
 test -f api/Dockerfile
-docker compose up -d --build --wait --wait-timeout 600
+if ! docker compose up -d --build --wait --wait-timeout 600 > /var/log/cidade-tech-deploy.log 2>&1; then
+  tail -n 60 /var/log/cidade-tech-deploy.log
+  exit 1
+fi
 docker compose ps
+echo "APPLICATION_UPDATE_COMPLETE"
 '@
 
-az vm run-command invoke `
-  --resource-group $resourceGroup `
-  --name $vmName `
-  --command-id RunShellScript `
-  --scripts $deployApplicationScript `
-  --output table
+Invoke-CidadeTechVmScript -Script $deployApplicationScript
 
 Consulte api/README.md para o contrato e as rotas reais do CRUD.
 
@@ -272,16 +285,11 @@ cd /opt/cidade-tech
 docker --version
 docker compose version
 docker compose ps
-docker compose logs --tail=100 database
-docker compose logs --tail=100 api
+docker compose logs --tail=10 database
+docker compose logs --tail=10 api
 '@
 
-az vm run-command invoke `
-  --resource-group $resourceGroup `
-  --name $vmName `
-  --command-id RunShellScript `
-  --scripts $inspectContainersScript `
-  --output table
+Invoke-CidadeTechVmScript -Script $inspectContainersScript
 
 10. CONSULTA DIRETA AO POSTGRESQL
 ---------------------------------
@@ -295,12 +303,7 @@ docker compose exec -T database psql -U empauta -d empauta -c "SELECT id, titulo
 docker compose exec -T database psql -U empauta -d empauta -c "SELECT consulta_id, usuario_id, escolha FROM votos ORDER BY id;"
 '@
 
-az vm run-command invoke `
-  --resource-group $resourceGroup `
-  --name $vmName `
-  --command-id RunShellScript `
-  --scripts $selectDatabaseScript `
-  --output table
+Invoke-CidadeTechVmScript -Script $selectDatabaseScript
 
 11. TESTAR A API
 -----------------------------------------
@@ -312,10 +315,13 @@ $publicIp = az network public-ip show `
   --query ipAddress `
   --output tsv
 
-Abra o Swagger em /swagger-ui.html e siga os exemplos de autenticação e CRUD em
-api/README.md. Este GET público confirma que a API responde:
+Abra o Swagger em `/swagger-ui/index.html` e siga os exemplos de autenticação e
+CRUD em `api/README.md`. Este GET público confirma que a API responde:
 
-Invoke-RestMethod -Uri "http://$($publicIp):8080/api/temas"
+Invoke-RestMethod -Uri "http://$($publicIp):8080/api/temas" -TimeoutSec 30
+
+Se `Invoke-RestMethod` falhar, confirme se o IPv4 público desta máquina continua
+igual ao valor usado em `$clientIp` e atualize a regra da NSG, se necessário.
 
 12. LIMPEZA OPCIONAL DOS RECURSOS AZURE
 ---------------------------------------

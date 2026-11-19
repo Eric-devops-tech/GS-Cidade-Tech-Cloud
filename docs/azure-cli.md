@@ -1,18 +1,20 @@
 # Azure CLI — provisionamento da rede e da VM
 
-O ambiente Cidade Tech está provisionado na assinatura Azure for Students, no
-Resource Group `rg-cidade-tech`, região `chilecentral`. A VM `vm-cidade-tech`
-usa Ubuntu 22.04 e `Standard_B2s_v2`; Docker Compose executa a API e o PostgreSQL.
-A NSG permite somente TCP/8080 do IPv4 autorizado. Não há regra de entrada para
-SSH ou PostgreSQL. Os recursos ativos podem consumir créditos enquanto estiverem
-ligados.
+O ambiente foi provisionado e demonstrado em vídeo. Depois da gravação, o
+Resource Group `rg-cidade-tech` foi excluído; portanto, **não há VM ou API
+Azure ativa agora**. Para reproduzir a implantação, use os comandos em
+[`azure-cli-comandos.txt`](../azure-cli-comandos.txt). Eles criam uma VM Ubuntu
+22.04 `Standard_B2s_v2` em `chilecentral`, com Docker Compose para a API e o
+PostgreSQL.
 
 Para consultar e copiar a sequência completa de comandos, incluindo a instalação
 do Docker pela Azure Run Command e as verificações da VM, use
 [`azure-cli-comandos.txt`](../azure-cli-comandos.txt). Este documento explica as
-etapas e a arquitetura do provisionamento. Não repita as etapas de criação
-enquanto esses recursos existirem. A URL da API é `http://<IP-PUBLICO>:8080`;
-consulte o IP atual com Azure CLI, sem registrá-lo junto ao IPv4 autorizado.
+etapas e a arquitetura do provisionamento. A criação requer uma assinatura Azure
+ativa com permissões, cota, disponibilidade dos recursos e cobrança habilitada;
+os custos serão cobrados na assinatura selecionada (créditos disponíveis podem
+ser aplicados). Se o Resource Group já existir, inspecione-o antes de executar
+novamente as etapas de criação.
 
 Os comandos abaixo são PowerShell. Informe o IPv4 público atual que deve acessar
 a aplicação; o sufixo `/32` restringe a regra a esse endereço. Não registre o IP
@@ -24,6 +26,8 @@ SSH pública.
 ```powershell
 az login
 az account show --output table
+# Selecione a assinatura que deve receber os recursos:
+# az account set --subscription "<nome ou ID da assinatura>"
 
 $resourceGroup = "rg-cidade-tech"
 $location = "chilecentral"
@@ -40,6 +44,34 @@ if (-not [System.Net.IPAddress]::TryParse($clientIp, [ref]$parsedIp) -or
   throw "Informe um endereço IPv4 válido."
 }
 $allowedIp = "$($parsedIp.IPAddressToString)/32"
+```
+
+As execuções de script Linux abaixo são enviadas codificadas em Base64 para
+evitar problemas de aspas e quebras de linha do PowerShell com o Azure CLI. O
+helper imprime a saída do Azure Run Command e interrompe o roteiro se o comando
+falhar:
+
+```powershell
+function Invoke-CidadeTechVmScript {
+  param([Parameter(Mandatory = $true)][string]$Script)
+
+  $encodedScript = [Convert]::ToBase64String(
+    [Text.Encoding]::UTF8.GetBytes($Script)
+  )
+  $remoteCommand = "echo $encodedScript | base64 -d | bash"
+  $result = az vm run-command invoke `
+    --resource-group $resourceGroup `
+    --name $vmName `
+    --command-id RunShellScript `
+    --scripts $remoteCommand `
+    --query "value[0].message" `
+    --output tsv
+
+  if ($LASTEXITCODE -ne 0) {
+    throw "Azure Run Command falhou na VM $vmName."
+  }
+  $result
+}
 ```
 
 ## 2. Resource Group, VNet e subnet
@@ -138,20 +170,19 @@ az network public-ip show `
   --output tsv
 ```
 
-Depois de executar a implantação descrita em `azure-cli-comandos.txt`, valide o CRUD pelo endereço
-`http://<IP-PUBLICO>:8080` e mostre `docker compose ps`, logs dos containers e
-consultas SQL executadas diretamente no PostgreSQL.
+Depois de executar a implantação descrita em `azure-cli-comandos.txt`, obtenha
+o IP público atual da VM e valide o CRUD em
+`http://<IP-PUBLICO>:8080/swagger-ui/index.html`. A NSG permite acesso somente
+do IPv4 informado na variável `$clientIp`. Para outro avaliador ou rede, atualize
+a origem da regra para o IPv4 atual antes de testar. Mostre também o estado e os
+logs dos containers e consultas SQL executadas diretamente no PostgreSQL.
 
 ## 6. Administração e limpeza
 
 Use Azure Run Command para administrar a VM sem abrir SSH público:
 
 ```powershell
-az vm run-command invoke `
-  --resource-group $resourceGroup `
-  --name $vmName `
-  --command-id RunShellScript `
-  --scripts "cd /opt/cidade-tech && docker compose ps"
+Invoke-CidadeTechVmScript -Script "cd /opt/cidade-tech && docker compose ps"
 ```
 
 As credenciais aleatórias do gestor inicial ficam em
@@ -159,18 +190,13 @@ As credenciais aleatórias do gestor inicial ficam em
 gravação usando Azure Run Command; não compartilhe nem grave a saída:
 
 ```powershell
-az vm run-command invoke `
-  --resource-group $resourceGroup `
-  --name $vmName `
-  --command-id RunShellScript `
-  --scripts "cat /root/cidade-tech-manager.txt" `
-  --query "value[0].message" `
-  --output tsv
+Invoke-CidadeTechVmScript -Script "cat /root/cidade-tech-manager.txt"
 ```
 
-Antes de remover os recursos, confira o nome do grupo e faça backup de qualquer
-dado que queira conservar. A remoção do grupo exclui a VM, o disco, o IP, a
-VNet, a subnet e a NSG do projeto:
+Quando terminar, os recursos podem permanecer ativos e gerar custos. Antes de
+removê-los, confira o nome do grupo e faça backup de qualquer dado que queira
+conservar. A remoção exclui a VM, o disco, o IP, a VNet, a subnet e a NSG do
+projeto:
 
 ```powershell
 az group delete --name $resourceGroup --yes --no-wait

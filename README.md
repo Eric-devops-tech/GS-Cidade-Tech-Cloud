@@ -31,15 +31,15 @@ O diagrama de infraestrutura Azure e as decisões estão em
 - [x] Diagrama Azure e comandos de provisionamento documentados.
 - [x] Compose integrado executado localmente; API e PostgreSQL iniciaram e o
   endpoint de saúde respondeu `UP`.
-- [x] VM `Standard_B2s_v2` provisionada em `chilecentral`; NSG permite somente
-  TCP/8080 do IPv4 autorizado. SSH e PostgreSQL não estão expostos.
-- [x] API validada na VM: saúde `UP`, leitura pública HTTP 200, autenticação de
-  gestor, criação/abertura de consulta e persistência confirmada no PostgreSQL.
-- [ ] Gravar o vídeo da entrega e demonstrar o fluxo completo.
+- [x] VM `Standard_B2s_v2` provisionada e API/CRUD/PostgreSQL demonstrados em
+  vídeo; os recursos Azure foram excluídos após a gravação.
+- [x] O roteiro Azure permite recriar a infraestrutura em uma assinatura com
+  cota e disponibilidade para os recursos documentados.
+- [x] Vídeo da entrega gravado.
 
 O relatório entregue junto da API também registra a migration e os fluxos de
-persistência PostgreSQL verificados pelo grupo Java. Os recursos Azure ativos
-podem gerar custos enquanto permanecerem ligados.
+persistência PostgreSQL verificados pelo grupo Java. A infraestrutura não está
+ativa agora; uma nova implantação Azure pode gerar custos.
 
 ## Executar localmente
 
@@ -112,8 +112,8 @@ versionada em `api/src/main/resources/db/migration/`.
 
 ## Entrega Cloud
 
-O vídeo deverá demonstrar a arquitetura e os recursos Azure, os containers e
-seus logs, o CRUD pela API e uma consulta SQL diretamente no PostgreSQL. Use o
-arquivo [azure-cli-comandos.txt](azure-cli-comandos.txt) como roteiro dos
-comandos; substitua o IP reservado de exemplo pelo IP autorizado antes de criar
-as regras de rede. O roteiro não provisiona recursos até ser executado.
+O vídeo gravado demonstra a arquitetura e os recursos Azure, os containers e
+seus logs, o CRUD pela API e consultas SQL diretamente no PostgreSQL. Para
+recriar o ambiente, siga [azure-cli-comandos.txt](azure-cli-comandos.txt) e
+informe o IPv4 público atual que deve acessar a API. Os comandos não criam
+recursos até serem executados.
